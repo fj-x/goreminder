@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+
+  app:
+    build:
+      context: . # Use an image built from the specified dockerfile in the current directory.
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    # restart: unless-stopped
+    # depends_on: 
+    #   - dynamodb
+    networks:
+      - backend
+
+  # dynamodb:
+  #   image:  amazon/dynamodb-local
+  #   container_name: my-dynamodb
+  #   hostname: dynamodb
+  #   restart: always
+  #   volumes:
+  #     -  ./my-dynamodb-data:/home/dynamodblocal/data
+  #   ports:
+  #     - 8000:8000
+  #   command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data/"
+  #   networks:
+  #     - backend
+
+networks:
+  backend:    
