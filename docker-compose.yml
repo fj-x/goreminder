@@ -9,23 +9,24 @@ services:
     ports:
       - "8080:8080"
     # restart: unless-stopped
-    # depends_on: 
-    #   - dynamodb
+    depends_on: 
+      - dynamodb
     networks:
       - backend
 
-  # dynamodb:
-  #   image:  amazon/dynamodb-local
-  #   container_name: my-dynamodb
-  #   hostname: dynamodb
-  #   restart: always
-  #   volumes:
-  #     -  ./my-dynamodb-data:/home/dynamodblocal/data
-  #   ports:
-  #     - 8000:8000
-  #   command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data/"
-  #   networks:
-  #     - backend
+  dynamodb:
+    image:  amazon/dynamodb-local
+    container_name: my-dynamodb
+    hostname: dynamodb
+    restart: always
+    volumes:
+      -  ./my-dynamodb-data:/home/dynamodblocal/data
+      # -  ./aws/credentials:/home/.aws/credentials
+    ports:
+      - 8000:8000
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data/"
+    networks:
+      - backend
 
 networks:
   backend:    

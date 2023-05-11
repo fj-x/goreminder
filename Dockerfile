@@ -20,6 +20,10 @@ RUN go mod download
 # Copy the source from the current directory to the Working Directory inside the container
 COPY . .
 
+COPY ./.aws /root/.aws
+COPY ./.aws /home/.aws
+
+
 # Build the Go app
 RUN go build -o main .
 
