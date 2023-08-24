@@ -1,27 +1,37 @@
 package event
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/fj-x/goreminder/telegram"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 )
 
 var events = make(map[int64][]Event)
 
-func CreateAction(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel, chatId string, db *dynamodb.DynamoDB) {
+type EventService struct {
+	eventRepo *eventRepository
+	bot       *telegram.TelegramBot
+}
+
+func NewEventService(eventRepo *eventRepository, bot *telegram.TelegramBot) *EventService {
+	return &EventService{
+		eventRepo: eventRepo,
+		bot:       bot,
+	}
+}
+
+func (service EventService) CreateAction(updates tgbotapi.UpdatesChannel, chatId string) {
 	newEvent := new(Event)
 	newEvent.Id = uuid.NewString()
 	newEvent.UserId = chatId
 
-	message(bot, chatId, "What is the name of the event?")
+	message(service.bot, chatId, "What is the name of the event?")
 
 	// Wait for the user to reply with the event name.
 	eventNameUpdate := <-updates
@@ -29,7 +39,7 @@ func CreateAction(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel, chatId 
 		newEvent.Name = eventNameUpdate.Message.Text
 	}
 
-	message(bot, chatId, "What is the date and time of the event? (formats: 2006-01-02 15:04, 2006-01-02, +5h)")
+	message(service.bot, chatId, "What is the date and time of the event? (formats: 2006-01-02 15:04, 2006-01-02, +5h)")
 
 	// Wait for the user to reply with the event date and time.
 	eventDateTimeUpdate := <-updates
@@ -42,12 +52,13 @@ func CreateAction(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel, chatId 
 		}
 	}
 
-	addEventToDynamoDB(*newEvent, db)
-	message(bot, chatId, fmt.Sprintf("Name: %s, Date: %s.", newEvent.Name, newEvent.DateTime))
+	service.eventRepo.AddEventToDynamoDB(*newEvent)
+
+	message(service.bot, chatId, fmt.Sprintf("Name: %s, Date: %s.", newEvent.Name, newEvent.DateTime))
 }
 
-func DeleteAction(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel, chatId string, db *dynamodb.DynamoDB) {
-	message(bot, chatId, "Give me ID of the event you want to delete")
+func (service EventService) DeleteAction(updates tgbotapi.UpdatesChannel, chatId string) {
+	message(service.bot, chatId, "Give me ID of the event you want to delete")
 
 	eventId := ""
 	// Wait for the user to reply with the event id.
@@ -56,67 +67,26 @@ func DeleteAction(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel, chatId 
 		eventId = eventIdUpdate.Message.Text
 	}
 
-	// Create the input for the DeleteItem operation
-	input := &dynamodb.DeleteItemInput{
-		TableName: aws.String("Events"),
-		Key: map[string]*dynamodb.AttributeValue{
-			"Id": {
-				S: aws.String(eventId),
-			},
-		},
-	}
-
-	// Call the DeleteItem operation
-	_, err := db.DeleteItem(input)
+	err := service.eventRepo.Delete(eventId)
 	if err != nil {
-		message(bot, chatId, fmt.Sprintf("Given ID: %s not found.", eventId))
+		message(service.bot, chatId, fmt.Sprintf("Given ID: %s not found.", eventId))
 
 		fmt.Println("Error deleting item:", err.Error())
 		return
 	}
 
-	message(bot, chatId, fmt.Sprintf("Item ID: %s deleted successfully.", eventId))
+	message(service.bot, chatId, fmt.Sprintf("Item ID: %s deleted successfully.", eventId))
 }
 
-func ListAction(bot *tgbotapi.BotAPI, chatId string, db *dynamodb.DynamoDB) {
+func (service EventService) ListAction(chatId string) {
+	data, _ := service.eventRepo.GetAllByChat(chatId)
 
-	queryInput := &dynamodb.QueryInput{
-		TableName:              aws.String("Events"),
-		IndexName:              aws.String("UserUdIdx"),
-		KeyConditionExpression: aws.String("UserId = :userId"),
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":userId": {
-				S: aws.String(chatId),
-			},
-		},
-	}
-
-	// execute the query and print the results
-	queryOutput, err := db.Query(queryInput)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	var events []Event
-	// Unmarshal the query results to the Events slice
-	for _, item := range queryOutput.Items {
-		var event Event
-		err := dynamodbattribute.UnmarshalMap(item, &event)
-		if err != nil {
-			fmt.Println("Error unmarshaling event:", err.Error())
-			continue
-		}
-		events = append(events, event)
-	}
-
-	jsn, _ := json.Marshal(events)
-	message(bot, chatId, string(jsn))
+	message(service.bot, chatId, string(data))
 }
 
-func message(bot *tgbotapi.BotAPI, chatId string, data string) {
+func message(bot *telegram.TelegramBot, chatId string, data string) {
 	chatIdInt, _ := strconv.ParseInt(chatId, 10, 64)
-	bot.Send(tgbotapi.NewMessage(chatIdInt, data))
+	bot.Bot.Send(tgbotapi.NewMessage(chatIdInt, data))
 }
 
 func parseDate(dateStr string) (time.Time, error) {

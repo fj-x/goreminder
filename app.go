@@ -6,7 +6,6 @@ import (
 	"github.com/fj-x/goreminder/db"
 	"github.com/fj-x/goreminder/event"
 	"github.com/fj-x/goreminder/telegram"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"strconv"
 )
@@ -16,11 +15,10 @@ func main() {
 	db := db.Connect()
 
 	bot := telegram.CreateBot()
+	updates := bot.ReadChannel()
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := bot.GetUpdatesChan(u)
+	eventRepository := event.NewEventRepository(db)
+	eventService := event.NewEventService(eventRepository, bot)
 
 	for update := range updates {
 		if update.Message == nil {
@@ -34,13 +32,13 @@ func main() {
 			chatId := strconv.FormatInt(update.Message.Chat.ID, 10)
 
 			if update.Message.Command() == "create" {
-				event.CreateAction(bot, updates, chatId, db)
+				eventService.CreateAction(updates, chatId)
 			}
 			if update.Message.Command() == "list" {
-				event.ListAction(bot, chatId, db)
+				eventService.ListAction(chatId)
 			}
 			if update.Message.Command() == "delete" {
-				event.DeleteAction(bot, updates, chatId, db)
+				eventService.DeleteAction(updates, chatId)
 			}
 		}
 	}

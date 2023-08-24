@@ -9,7 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-func Connect() *dynamodb.DynamoDB {
+type Connection struct {
+	Client *dynamodb.DynamoDB
+}
+
+func Connect() *Connection {
 	awsConfig := aws.Config{
 		Endpoint: aws.String("http://dynamodb:8000"),
 	}
@@ -20,7 +24,7 @@ func Connect() *dynamodb.DynamoDB {
 	}))
 
 	// Create DynamoDB client
-	return dynamodb.New(sess)
+	return &Connection{Client: dynamodb.New(sess)}
 	// createTable(db)
 }
 

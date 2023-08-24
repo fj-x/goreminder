@@ -6,7 +6,11 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func CreateBot() *tgbotapi.BotAPI {
+type TelegramBot struct {
+	Bot *tgbotapi.BotAPI
+}
+
+func CreateBot() *TelegramBot {
 	botToken := "6227206106:AAEsGtMRitg17YSVsSco7cWySFxSqCO0uTc"
 
 	bot, err := tgbotapi.NewBotAPI(botToken)
@@ -38,5 +42,12 @@ func CreateBot() *tgbotapi.BotAPI {
 
 	bot.Request(config)
 
-	return bot
+	return &TelegramBot{Bot: bot}
+}
+
+func (bot *TelegramBot) ReadChannel() tgbotapi.UpdatesChannel {
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+
+	return bot.Bot.GetUpdatesChan(u)
 }
